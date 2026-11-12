@@ -294,7 +294,10 @@
       const totalGunsAll = stock.schofield + stock.double;
       const totalGunsRemain = sRemain + dRemain;
       const totalReadyPercent = totalGunsAll > 0 ? Math.round((totalGunsRemain / totalGunsAll) * 100) : 0;
-      const activeHoldersCount = members.filter(m => (Number(m.schofield) || 0) + (Number(m.double) || 0) > 0).length;
+
+      // กรองเฉพาะคนที่ยังถือปืนอยู่อย่างน้อย 1 กระบอก
+      const activeMembers = members.filter(m => (Number(m.schofield) || 0) + (Number(m.double) || 0) > 0);
+      const activeHoldersCount = activeMembers.length;
 
       const handleAddMember = (e) => {
         e.preventDefault();
@@ -342,10 +345,20 @@
           if (type === 'double' && dRemain <= 0) return;
         }
         const next = Math.max(0, current + delta);
-        db.ref(`members/${id}`).update({ [type]: next });
+        const otherType = type === 'schofield' ? 'double' : 'schofield';
+        const otherCount = Number(target[otherType]) || 0;
 
         const gunName = type === 'schofield' ? 'สกอฟิล' : 'ดับเบิ้ล';
-        addLog(`ปรับ ${gunName} ของ "${target.name}" เป็น ${next} (${delta > 0 ? '+1 เบิกเพิ่ม' : '-1 คืนคลัง'})`, delta > 0 ? 'add' : 'return');
+
+        // ถ้าคืนปืนจนทั้งสกอฟิลและดับเบิ้ลเหลือ 0 ทั้งคู่ ให้ลบชื่อออกจากรายการหน้าหลักอัตโนมัติ
+        if (next === 0 && otherCount === 0) {
+          addLog(`คืน ${gunName} ของ "${target.name}" ครบทั้งหมดแล้ว (เคลียร์รายชื่อออกจากคลัง)`, 'return');
+          db.ref(`members/${id}`).remove();
+        } else {
+          db.ref(`members/${id}`).update({ [type]: next });
+          addLog(`ปรับ ${gunName} ของ "${target.name}" เป็น ${next} (${delta > 0 ? '+1 เบิกเพิ่ม' : '-1 คืนคลัง'})`, delta > 0 ? 'add' : 'return');
+        }
+
         if (delta > 0) {
           recordStat(target.name, type === 'schofield' ? 1 : 0, type === 'double' ? 1 : 0);
         }
@@ -379,11 +392,10 @@
         text += `🔫 สกอฟิล: เหลือ ${sRemain}/${stock.schofield}\n`;
         text += `💥 ดับเบิ้ล: เหลือ ${dRemain}/${stock.double}\n\n`;
         text += `📋 รายชื่อสมาชิกที่ถือปืน:\n`;
-        const activeHolders = members.filter(m => (m.schofield || 0) > 0 || (m.double || 0) > 0);
-        if (activeHolders.length === 0) {
+        if (activeMembers.length === 0) {
           text += `- คลังครบ ปืนอยู่ในตู้ทั้งหมด\n`;
         } else {
-          activeHolders.forEach(m => {
+          activeMembers.forEach(m => {
             const guns = [];
             if (m.schofield > 0) guns.push(`สกอฟิล ${m.schofield}`);
             if (m.double > 0) guns.push(`ดับเบิ้ล ${m.double}`);
@@ -439,7 +451,7 @@
         return totalB - totalA;
       });
 
-      const filteredMembers = members.filter(m =>
+      const filteredMembers = activeMembers.filter(m =>
         !memberSearch.trim() || m.name.toLowerCase().includes(memberSearch.toLowerCase())
       );
 
@@ -520,7 +532,7 @@
               </div>
             </header>
 
-            {/* MAIN GRID LAYOUT*/}
+            {/* MAIN GRID LAYOUT: ขยายเต็ม 12 คอลัมน์ บาลานซ์ซ้าย 7 - ขวา 5 */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               
               {/* ฝั่งซ้าย: ยอดปืนพร้อมหลอดพลัง + ฟอร์มเบิก + รายชื่อคนถือปืน */}
@@ -643,7 +655,7 @@
 
                     {filteredMembers.length === 0 ? (
                       <div className="p-8 text-center text-zinc-300 text-xs bg-black/30 rounded-xl border border-white/5">
-                        {members.length === 0 ? 'ยังไม่มีใครถือปืน อาวุธครบอยู่ในคลังทั้งหมด' : 'ไม่พบชื่อสมาชิกที่ค้นหา'}
+                        {activeMembers.length === 0 ? 'ยังไม่มีใครถือปืน อาวุธครบอยู่ในคลังทั้งหมด' : 'ไม่พบชื่อสมาชิกที่ค้นหา'}
                       </div>
                     ) : (
                       <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1">
@@ -885,7 +897,7 @@
             </div>
           )}
 
-          {/* MODAL 2: ตั้งค่าคลังปืน & ฝังรูปลงเซิร์ฟเวอร์ (เฉพาะปอนด์คนเดียวที่เปิดได้) */}
+          {/* MODAL 2: ตั้งค่าคลังปืน & ฝังรูปลงเซิร์ฟเวอร์*/}
           {isAdmin && isSettingOpen && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
               <div className="glass-panel-red bg-zinc-950/90 rounded-3xl max-w-md w-full p-6 space-y-5">
