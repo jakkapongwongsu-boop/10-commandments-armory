@@ -328,7 +328,7 @@
         sendDiscordWebhook(text, type, customSRemain, customDRemain);
       };
 
-      // ใครก็ได้กดลบ Log ทีละรายการได้ แต่ระบบจะฟ้องทันทีว่าใครเป็นคนกดลบอะไรออกไป
+      // ลบ Log ทีละรายการ พร้อมสร้างบรรทัดฟ้องว่าใครลบ
       const deleteSingleLog = (logItem) => {
         const confirmDel = window.confirm(`ยืนยันลบประวัตินี้ใช่หรือไม่?\n(ระบบจะบันทึกชื่อ Discord ของคุณว่ากดลบรายการนี้)`);
         if (!confirmDel) return;
@@ -337,7 +337,7 @@
         });
       };
 
-      // ใครก็ได้กดล้าง Log ขยะทั้งหมดได้ แต่ระบบจะสร้างบรรทัดใหม่ฟ้องทันทีว่าใครเป็นคนล้าง
+      // ล้าง Log ขยะทั้งหมด พร้อมสร้างบรรทัดฟ้องว่าใครล้าง
       const clearAllLogs = () => {
         const confirmClear = window.confirm('⚠️ ยืนยันการล้างประวัติ Log ขยะทั้งหมดใช่หรือไม่?\n(ระบบจะประกาศชื่อ Discord ของคุณว่าเป็นคนกดล้างประวัติทั้งหมด)');
         if (!confirmClear) return;
@@ -359,13 +359,22 @@
         });
       };
 
+      // ลบรายชื่อออกจากอันดับมือปืน (Leaderboard) ทีละคน พร้อมลง Log ฟ้องว่าใครลบ
+      const deleteSingleStat = (statKey, item) => {
+        const confirmDel = window.confirm(`ยืนยันลบ "${item.name}" ออกจากอันดับมือปืน (Leaderboard) ใช่หรือไม่?\n(ระบบจะบันทึกชื่อ Discord ของคุณว่ากดลบอันดับนี้)`);
+        if (!confirmDel) return;
+        db.ref(`stats/${statKey}`).remove().then(() => {
+          addLog(`🚨 ได้ลบสถิติอันดับมือปืนของ "${item.name}" (สกอฟิล ${item.totalSchofield || 0}, ดับเบิ้ล ${item.totalDouble || 0}) ออกจาก Leaderboard!`, 'delete');
+        });
+      };
+
+      // ล้างอันดับมือปืน (Leaderboard) ทั้งหมด พร้อมลง Log ฟ้องว่าใครกดล้าง
       const handleResetLeaderboard = () => {
-        if (!isAdmin) return;
-        const confirmReset = window.confirm('⚠️ ยืนยันการล้างสถิติ "อันดับมือปืนแก๊ง (Leaderboard)" ทั้งหมดเพื่อเริ่มนับซีซั่นใหม่หรือไม่?');
+        const confirmReset = window.confirm('⚠️ ยืนยันการล้างสถิติ "อันดับมือปืนแก๊ง (Leaderboard)" ทั้งหมดใช่หรือไม่?\n(ระบบจะบันทึกชื่อ Discord ของคุณว่าเป็นคนกดล้างอันดับทั้งหมด)');
         if (!confirmReset) return;
-        db.ref('stats').remove();
-        addLog('🏆 แอดมินได้รีเซ็ตสถิติ Leaderboard เริ่มต้นซีซั่นใหม่แล้ว', 'setting');
-        alert('ล้างสถิติ Leaderboard เรียบร้อยแล้ว!');
+        db.ref('stats').remove().then(() => {
+          addLog('🚨 ได้กดล้างสถิติอันดับมือปืน (Leaderboard) ทั้งหมด!', 'delete');
+        });
       };
 
       const handleUploadThemeImage = async (e, type) => {
@@ -551,7 +560,11 @@
         );
       }
 
-      const leaderboardData = Object.values(stats).sort((a, b) => {
+      // ดึงข้อมูล Leaderboard พร้อม key สำหรับกดลบรายคน
+      const leaderboardData = Object.entries(stats).map(([key, val]) => ({
+        key,
+        ...val
+      })).sort((a, b) => {
         const totalA = (a.totalSchofield || 0) + (a.totalDouble || 0);
         const totalB = (b.totalSchofield || 0) + (b.totalDouble || 0);
         return totalB - totalA;
@@ -836,19 +849,28 @@
                   </div>
                 </div>
 
-                {/* อันดับมือปืนแก๊ง */}
+                {/* อันดับมือปืนแก๊ง (Leaderboard) พร้อมปุ่มลบรายคนและล้างทั้งหมด */}
                 <div className="glass-panel p-5 rounded-2xl space-y-3.5">
                   <div className="flex items-center justify-between border-b border-white/15 pb-3">
                     <h3 className="text-sm font-bold text-white flex items-center gap-2 text-shadow-hard">
                       🏆 อันดับมือปืนแก๊ง (Leaderboard)
                     </h3>
-                    <span className="text-xs text-zinc-300">ยอดเบิกสะสมทั้งหมด</span>
+                    {leaderboardData.length > 0 && (
+                      <button
+                        onClick={handleResetLeaderboard}
+                        className="bg-red-800 hover:bg-red-600 text-white text-xs font-bold px-2.5 py-1 rounded-lg border border-red-400/50 transition"
+                        style={{ backgroundColor: '#991b1b' }}
+                        title="ล้างอันดับทั้งหมด (ระบบจะบันทึกชื่อคนกดล้าง)"
+                      >
+                        🔥 ล้างอันดับ
+                      </button>
+                    )}
                   </div>
                   {leaderboardData.length === 0 ? (
                     <div className="p-6 text-center text-zinc-300 text-xs">ยังไม่มีสถิติการเบิกปืน</div>
                   ) : (
                     <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                      {leaderboardData.slice(0, 6).map((item, idx) => {
+                      {leaderboardData.map((item, idx) => {
                         const total = (item.totalSchofield || 0) + (item.totalDouble || 0);
                         const medal = idx === 0 ? '👑' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
                         let rankStyle = "bg-black/40 border-white/10";
@@ -857,13 +879,22 @@
                         if (idx === 2) rankStyle = "bg-red-950/40 border-orange-400/40";
 
                         return (
-                          <div key={idx} className={`flex items-center justify-between text-xs py-2.5 px-3 rounded-xl border transition ${rankStyle}`}>
-                            <div className="flex items-center gap-2.5">
-                              <span className="w-6 text-center font-extrabold text-sm text-yellow-300 text-shadow-hard">{medal}</span>
-                              <span className="font-bold text-white text-shadow-hard">{item.name}</span>
+                          <div key={item.key} className={`flex items-center justify-between text-xs py-2 px-3 rounded-xl border transition ${rankStyle}`}>
+                            <div className="flex items-center gap-2.5 overflow-hidden">
+                              <span className="w-6 text-center font-extrabold text-sm text-yellow-300 text-shadow-hard flex-shrink-0">{medal}</span>
+                              <span className="font-bold text-white text-shadow-hard truncate">{item.name}</span>
                             </div>
-                            <div className="text-zinc-200 text-shadow-hard">
-                              สกอฟิล {item.totalSchofield || 0} • ดับเบิ้ล {item.totalDouble || 0} <span className="text-yellow-300 font-extrabold ml-1.5">({total})</span>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <div className="text-zinc-200 text-shadow-hard">
+                                สกอฟิล {item.totalSchofield || 0} • ดับเบิ้ล {item.totalDouble || 0} <span className="text-yellow-300 font-extrabold ml-1">({total})</span>
+                              </div>
+                              <button
+                                onClick={() => deleteSingleStat(item.key, item)}
+                                className="bg-red-900/70 hover:bg-red-600 text-red-200 hover:text-white px-2 py-1 rounded-lg text-xs transition"
+                                title="ลบชื่อนี้ออกจากอันดับ (ระบบจะบันทึกชื่อคนลบ)"
+                              >
+                                🗑️
+                              </button>
                             </div>
                           </div>
                         );
@@ -937,7 +968,7 @@
             </div>
           </div>
 
-          {/* MODAL 1: หน้าต่างเช็คประวัติ Log ย้อนหลังทั้งหมด (ทุกคนกดลบได้ แต่ระบบฟ้องชื่อคนลบ) */}
+          {/* MODAL 1: หน้าต่างเช็คประวัติ Log ย้อนหลังทั้งหมด */}
           {isFullLogOpen && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
               <div className="glass-panel-red bg-zinc-950/90 rounded-3xl max-w-3xl w-full p-6 space-y-4 max-h-screen flex flex-col" style={{ maxHeight: '90vh' }}>
@@ -1032,7 +1063,7 @@
             </div>
           )}
 
-          {/* MODAL 2: ตั้งค่าคลังปืน & Discord Webhook & รีเซ็ตสถิติ (เฉพาะปอนด์คนเดียว) */}
+          {/* MODAL 2: ตั้งค่าคลังปืน & Discord Webhook (เฉพาะปอนด์คนเดียว) */}
           {isAdmin && isSettingOpen && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
               <div className="glass-panel-red bg-zinc-950/95 rounded-3xl max-w-md w-full p-6 space-y-5 max-h-screen overflow-y-auto" style={{ maxHeight: '92vh' }}>
@@ -1102,22 +1133,6 @@
                       onChange={e => setWebhookInput(e.target.value)}
                       className="w-full bg-black/60 border border-white/20 px-3 py-2 rounded-xl text-xs text-white outline-none"
                     />
-                  </div>
-
-                  {/* ปุ่มรีเซ็ต Leaderboard */}
-                  <div className="bg-red-950/35 p-4 rounded-2xl border border-red-500/40 flex items-center justify-between gap-2">
-                    <div>
-                      <div className="text-xs font-bold text-red-300">🏆 รีเซ็ตอันดับมือปืน (เริ่มซีซั่นใหม่)</div>
-                      <div className="text-xs text-zinc-400">ล้างเฉพาะคะแนน Leaderboard (ไม่กระทบยอดปืนปัจจุบัน)</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleResetLeaderboard}
-                      className="bg-red-800 hover:bg-red-700 text-white text-xs font-bold px-3 py-2 rounded-xl flex-shrink-0 border border-red-400/50"
-                      style={{ backgroundColor: '#991b1b' }}
-                    >
-                      ล้างอันดับ
-                    </button>
                   </div>
 
                   <div className="flex gap-2 justify-end pt-2">
