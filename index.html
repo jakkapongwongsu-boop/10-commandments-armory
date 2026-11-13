@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>คลังแสงแก๊ง 10 บัญญัติ</title>
   
-  <!-- CSS สำรองตัวที่ 1: Cloudflare Tailwind (เสถียรและไม่โดนบล็อกง่าย) -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
-  <!-- CSS ตัวหลัก: Tailwind Play CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
 
   <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
@@ -23,7 +21,6 @@
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <style>
-    /* CSS พื้นฐานฝังในตัวเว็บ (ป้องกันหน้าพัง 100% แม้ CDN โดนบล็อก) */
     * { box-sizing: border-box; }
     body {
       font-family: 'Kanit', sans-serif;
@@ -280,15 +277,14 @@
         setCurrentUser(null);
       };
 
-      // ฟังก์ชันยิงแจ้งเตือนเข้า Discord Webhook
       const sendDiscordWebhook = (text, type, nextSRemain, nextDRemain) => {
         if (!themeImages.webhookUrl || !themeImages.webhookUrl.startsWith('https://discord.com/api/webhooks/')) return;
         
-        let color = 3447003; // น้ำเงิน
+        let color = 3447003;
         let title = "📜 อัปเดตคลังแสง 10 บัญญัติ";
         if (type === 'add') { color = 3066993; title = "🟢 มีการเบิกอาวุธออกจากคลัง"; }
         if (type === 'return') { color = 15105570; title = "🟠 มีการคืนอาวุธเข้าคลัง"; }
-        if (type === 'delete') { color = 15158332; title = "🚨 แจ้งเตือนการลบรายชื่อคนถือปืน!"; }
+        if (type === 'delete') { color = 15158332; title = "🚨 แจ้งเตือนการลบข้อมูล!"; }
         if (type === 'setting') { color = 10181046; title = "⚙️ แอดมินปรับปรุงการตั้งค่าคลัง"; }
 
         const payload = {
@@ -330,6 +326,25 @@
           timestamp: Date.now()
         });
         sendDiscordWebhook(text, type, customSRemain, customDRemain);
+      };
+
+      // ใครก็ได้กดลบ Log ทีละรายการได้ แต่ระบบจะฟ้องทันทีว่าใครเป็นคนกดลบอะไรออกไป
+      const deleteSingleLog = (logItem) => {
+        const confirmDel = window.confirm(`ยืนยันลบประวัตินี้ใช่หรือไม่?\n(ระบบจะบันทึกชื่อ Discord ของคุณว่ากดลบรายการนี้)`);
+        if (!confirmDel) return;
+        db.ref(`logs/${logItem.id}`).remove().then(() => {
+          addLog(`🚨 ได้ลบประวัติ Log: "[${logItem.actor}] ${logItem.text}" ออกไป`, 'delete');
+        });
+      };
+
+      // ใครก็ได้กดล้าง Log ขยะทั้งหมดได้ แต่ระบบจะสร้างบรรทัดใหม่ฟ้องทันทีว่าใครเป็นคนล้าง
+      const clearAllLogs = () => {
+        const confirmClear = window.confirm('⚠️ ยืนยันการล้างประวัติ Log ขยะทั้งหมดใช่หรือไม่?\n(ระบบจะประกาศชื่อ Discord ของคุณว่าเป็นคนกดล้างประวัติทั้งหมด)');
+        if (!confirmClear) return;
+        const count = logs.length;
+        db.ref('logs').remove().then(() => {
+          addLog(`🚨 ได้กดล้างประวัติ Log ขยะทั้งหมด (${count} รายการ)!`, 'delete');
+        });
       };
 
       const recordStat = (personName, sCount, dCount) => {
@@ -459,7 +474,7 @@
         const nextD = Math.min(stock.double, dRemain + (Number(target.double) || 0));
 
         const gunDetails = `(ตอนลบถือ: สกอฟิล ${target.schofield || 0}, ดับเบิ้ล ${target.double || 0})`;
-        addLog(`🚨 ได้ลบ "${target.name}" ออกจากระบบ! ${gunDetails}`, 'delete', nextS, nextD);
+        addLog(`🚨 ได้ลบรายชื่อ "${target.name}" ออกจากระบบ! ${gunDetails}`, 'delete', nextS, nextD);
         db.ref(`members/${id}`).remove();
       };
 
@@ -634,7 +649,6 @@
                 
                 {/* การ์ดยอดปืนคงเหลือ + หลอดพลัง */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* สกอฟิล */}
                   <div className="glass-panel p-5 rounded-2xl space-y-3 relative overflow-hidden">
                     <div className="flex justify-between items-start">
                       <div>
@@ -657,7 +671,6 @@
                     </div>
                   </div>
 
-                  {/* ดับเบิ้ล */}
                   <div className="glass-panel p-5 rounded-2xl space-y-3 relative overflow-hidden">
                     <div className="flex justify-between items-start">
                       <div>
@@ -870,7 +883,7 @@
                       className="bg-red-700 hover:bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg border border-red-400/50 transition"
                       style={{ backgroundColor: '#b91c1c' }}
                     >
-                      🔍 เช็ค Log ย้อนหลัง ({logs.length})
+                      🔍 เช็ค / ลบ Log ({logs.length})
                     </button>
                   </div>
 
@@ -899,6 +912,13 @@
                                 <div className="text-xs text-zinc-300">{log.time}</div>
                               </div>
                             </div>
+                            <button
+                              onClick={() => deleteSingleLog(log)}
+                              className="bg-red-900/70 hover:bg-red-600 text-red-200 hover:text-white px-2 py-1 rounded-lg text-xs flex-shrink-0 transition"
+                              title="ลบประวัตินี้ (ระบบจะบันทึกชื่อคนลบ)"
+                            >
+                              🗑️
+                            </button>
                           </div>
                         );
                       })}
@@ -909,7 +929,7 @@
                     onClick={() => setIsFullLogOpen(true)}
                     className="w-full bg-black/50 hover:bg-white/10 text-zinc-100 text-xs font-semibold py-2.5 rounded-xl border border-white/20 transition text-shadow-hard"
                   >
-                    📂 เปิดหน้าต่างไล่ดูประวัติ Log เก่าๆ ทั้งหมด
+                    📂 เปิดหน้าต่างจัดการ / ล้างประวัติ Log ทั้งหมด
                   </button>
                 </div>
 
@@ -917,7 +937,7 @@
             </div>
           </div>
 
-          {/* MODAL 1: หน้าต่างเช็คประวัติ Log ย้อนหลังทั้งหมด */}
+          {/* MODAL 1: หน้าต่างเช็คประวัติ Log ย้อนหลังทั้งหมด (ทุกคนกดลบได้ แต่ระบบฟ้องชื่อคนลบ) */}
           {isFullLogOpen && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
               <div className="glass-panel-red bg-zinc-950/90 rounded-3xl max-w-3xl w-full p-6 space-y-4 max-h-screen flex flex-col" style={{ maxHeight: '90vh' }}>
@@ -926,9 +946,20 @@
                     <h3 className="font-bold text-lg text-red-400 flex items-center gap-2">
                       📜 ประวัติ Log ย้อนหลังทั้งหมด ({filteredLogs.length} รายการ)
                     </h3>
-                    <p className="text-xs text-zinc-300">ค้นหาชื่อคนเบิก คนกดลบ หรือเลือกดูเฉพาะรายการที่ต้องการ</p>
+                    <p className="text-xs text-zinc-300">หากกดลบรายการใด ระบบจะบันทึกชื่อ Discord ของผู้ลบไว้ทันที</p>
                   </div>
-                  <button onClick={() => setIsFullLogOpen(false)} className="text-zinc-300 hover:text-white text-xl font-bold px-2">✕</button>
+                  <div className="flex items-center gap-2">
+                    {logs.length > 0 && (
+                      <button
+                        onClick={clearAllLogs}
+                        className="bg-red-800 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl border border-red-400/50 transition"
+                        style={{ backgroundColor: '#991b1b' }}
+                      >
+                        🔥 ล้าง Log ขยะทั้งหมด
+                      </button>
+                    )}
+                    <button onClick={() => setIsFullLogOpen(false)} className="text-zinc-300 hover:text-white text-xl font-bold px-2">✕</button>
+                  </div>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2">
@@ -955,7 +986,7 @@
                     <button
                       onClick={() => setLogFilterType('delete')}
                       className={`px-3 py-2 rounded-xl text-xs font-bold ${logFilterType === 'delete' ? 'bg-red-800 text-white' : 'bg-white/10 text-zinc-300'}`}
-                    >🚨 ลบข้อมูล</button>
+                    >🚨 ประวัติการลบ</button>
                   </div>
                 </div>
 
@@ -971,18 +1002,27 @@
 
                       return (
                         <div key={log.id} className={`p-3 rounded-xl border flex items-center justify-between gap-3 text-xs ${borderStyle}`}>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 overflow-hidden">
                             {log.avatar ? (
                               <img src={log.avatar} alt="" className="w-7 h-7 rounded-full flex-shrink-0 border border-red-500/50" style={{ width: '28px', height: '28px' }} />
                             ) : (
                               <div className="w-7 h-7 rounded-full bg-zinc-700 flex-shrink-0"></div>
                             )}
-                            <div>
+                            <div className="truncate">
                               <span className="font-bold text-yellow-300 mr-2">[{log.actor}]</span>
                               <span className={log.type === 'delete' ? 'text-red-300 font-bold' : 'text-zinc-100'}>{log.text}</span>
                             </div>
                           </div>
-                          <span className="text-xs text-zinc-300 flex-shrink-0 font-mono">{log.time}</span>
+                          <div className="flex items-center gap-2.5 flex-shrink-0">
+                            <span className="text-xs text-zinc-300 font-mono">{log.time}</span>
+                            <button
+                              onClick={() => deleteSingleLog(log)}
+                              className="bg-red-900/80 hover:bg-red-600 text-red-200 hover:text-white px-2 py-1 rounded-lg text-xs transition"
+                              title="ลบบรรทัดนี้ (ระบบจะบันทึกชื่อคุณว่ากดลบ)"
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         </div>
                       );
                     })
